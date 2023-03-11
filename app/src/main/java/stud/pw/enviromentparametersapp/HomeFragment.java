@@ -1,5 +1,6 @@
 package stud.pw.enviromentparametersapp;
 
+import android.content.Intent;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -9,13 +10,14 @@ import androidx.fragment.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
 
 import stud.pw.enviromentparametersapp.models.Sensor;
-import stud.pw.enviromentparametersapp.models.TemperatureRecord;
+import stud.pw.enviromentparametersapp.models.ParametersRecord;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -24,7 +26,7 @@ import stud.pw.enviromentparametersapp.models.TemperatureRecord;
  */
 public class HomeFragment extends Fragment {
     ArrayList<Sensor> sensorsList;
-    ArrayList<TemperatureRecord> lastTemperaturesList;
+    ArrayList<ParametersRecord> lastRecordsList;
     ListView list;
     private static LastUpdateListAdapter adapter;
 
@@ -82,24 +84,26 @@ public class HomeFragment extends Fragment {
 
         DbMock dbMock = new DbMock();
         sensorsList = dbMock.getSensorsList();
-        lastTemperaturesList = dbMock.getLastTemperatures();
+        lastRecordsList = dbMock.getLastRecords();
 
         TextView lastUpdateValue = (TextView) view.findViewById(R.id.laastUpdateValue);
         lastUpdateValue.setText(dbMock.getLastUpdateDateString());
 
         list = (ListView) view.findViewById(R.id.lastUpdateList);
-        adapter = new LastUpdateListAdapter(getActivity(), sensorsList, lastTemperaturesList);
+        adapter = new LastUpdateListAdapter(getActivity(), sensorsList, lastRecordsList);
         list.setAdapter(adapter);
-        /*list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+
+        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                Sensor sensor = roomsList.get(i);
+                Sensor sensor = sensorsList.get(i);
 
-                Intent mIntent = new Intent(RoomsActivity.this, RoomActivity.class);
-                mIntent.putExtra("roomId", room.getId());
+                Intent mIntent = new Intent(getActivity(), SensorActivity.class);
+                mIntent.putExtra("sensorId", sensor.getId());
                 startActivity(mIntent);
             }
-        });*/
+        });
+
 
     }
 }

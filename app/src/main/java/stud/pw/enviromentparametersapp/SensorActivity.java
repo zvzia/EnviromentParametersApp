@@ -6,11 +6,8 @@ import androidx.core.util.Pair;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.AutoCompleteTextView;
-import android.widget.Toast;
 
+import com.anychart.APIlib;
 import com.anychart.AnyChart;
 import com.anychart.AnyChartView;
 import com.anychart.chart.common.dataentry.DataEntry;
@@ -31,15 +28,16 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
-import stud.pw.enviromentparametersapp.models.TemperatureRecord;
+import stud.pw.enviromentparametersapp.models.ParametersRecord;
 
 public class SensorActivity extends AppCompatActivity {
 
-    private ArrayList<TemperatureRecord> temperatureRecords;
+    private ArrayList<ParametersRecord> parametersRecords;
     private int sensorId;
-    private AnyChartView anyChartView;
-    private Date start = null;
-    private Date end = null;
+    Cartesian cartesianTemp;
+    Line seriesTemp;
+    Cartesian cartesianHumid;
+    Line seriesHumid;
 
 
 
@@ -51,15 +49,11 @@ public class SensorActivity extends AppCompatActivity {
         Intent mIntent = getIntent();
         sensorId = mIntent.getIntExtra("sensorId", 0);
 
-        setTitle(String.valueOf(sensorId));
+        DbMock dbMock = new DbMock();
+        setTitle(dbMock.getSensorById(sensorId).getName());
 
 
-        /*Calendar cal = Calendar.getInstance();
-        Date end = cal.getTime();
-        cal.add(Calendar.DATE, -30);
-        Date start =cal.getTime();*/
-
-        //showChart();
+        initializeCharts();
     }
 
     public void showDatePicker(View view) {
@@ -71,75 +65,106 @@ public class SensorActivity extends AppCompatActivity {
             @Override
             public void onPositiveButtonClick(Object selection) {
                 Pair<Long, Long> dates = (Pair<Long, Long>) selection;
-                start = new Date(dates.first);
-                end = new Date(dates.second);
+                Date start = new Date(dates.first);
+                Date end = new Date(dates.second);
 
-                showChart();
+                updateCharts(start, end);
             }
         });
 
     }
 
-    private void showChart(){
-        if(start == null && end == null){
-            Calendar cal = Calendar.getInstance();
-            end = cal.getTime();
-            cal.add(Calendar.DATE, -30);
-            start =cal.getTime();
-        }
+    private void initializeCharts(){
+
+        Calendar cal = Calendar.getInstance();
+        Date end = cal.getTime();
+        cal.add(Calendar.DATE, -30);
+        Date start  =cal.getTime();
+
         DbMock dbMock = new DbMock();
-        temperatureRecords = dbMock.getTemperaturesForSensorInRange(sensorId, start, end);
+        parametersRecords = dbMock.getRecordsForSensorInRange(sensorId, start, end);
 
-        anyChartView = findViewById(R.id.any_chart_view);
-        Cartesian cartesian = AnyChart.line();
-        cartesian.animation(true);
-        //cartesian.padding(10d, 20d, 5d, 20d);
+        //--- temperature chart ---
+        AnyChartView anyChartViewTemp = findViewById(R.id.temperature_chart);
+        APIlib.getInstance().setActiveAnyChartView(anyChartViewTemp);
+        cartesianTemp = AnyChart.line();
+        cartesianTemp.animation(true);
+        cartesianTemp.title("Temperatures");
 
-        cartesian.crosshair().enabled(true);
-        cartesian.crosshair()
-                .yLabel(true)
-                // TODO ystroke
-                .yStroke((Stroke) null, null, null, (String) null, (String) null);
-
-        cartesian.tooltip().positionMode(TooltipPositionMode.POINT);
-
-        //cartesian.title("Wykres odczytów");
-        cartesian.yAxis(0).title("Temperatura");
-        cartesian.xAxis(0).labels().padding(1d, 1d, 1d, 1d);
-
-        List<DataEntry> seriesData = new ArrayList<>();
-        for (TemperatureRecord record : temperatureRecords) {
-            seriesData.add(new CustomDataEntry(record));
+        List<DataEntry> seriesDataTemp = new ArrayList<>();
+        for (ParametersRecord record : parametersRecords) {
+            seriesDataTemp.add(new CustomDataEntryTemp(record));
         }
 
-        Set set = Set.instantiate();
-        set.data(seriesData);
-        Mapping series1Mapping = set.mapAs("{ x: 'x', value: 'value' }");
+        seriesTemp = cartesianTemp.line(seriesDataTemp);
+        seriesTemp.name("Temperature");
+        seriesTemp.color("#4F5783");
 
-        Line series1 = cartesian.line(series1Mapping);
-        //series1.name("Brandy");
-        series1.hovered().markers().enabled(true);
-        series1.hovered().markers()
-                .type(MarkerType.CIRCLE)
-                .size(4d);
-        series1.tooltip()
-                .position("right")
-                .anchor(Anchor.LEFT_CENTER)
-                .offsetX(5d)
-                .offsetY(5d);
+        anyChartViewTemp.setChart(cartesianTemp);
 
 
-        /*cartesian.legend().enabled(true);
-        cartesian.legend().fontSize(13d);
-        cartesian.legend().padding(0d, 0d, 10d, 0d);*/
+        //--- humidity chart ---
+        AnyChartView anyChartViewHumid = findViewById(R.id.humidity_chart);
+        APIlib.getInstance().setActiveAnyChartView(anyChartViewHumid);
+        cartesianHumid = AnyChart.line();
+        cartesianHumid.animation(true);
+        cartesianHumid.title("Humidity");
 
-        anyChartView.setChart(cartesian);
+        List<DataEntry> seriesDataHumid = new ArrayList<>();
+        for (ParametersRecord record : parametersRecords) {
+            seriesDataHumid.add(new CustomDataEntryHumid(record));
+        }
+
+        seriesHumid = cartesianHumid.line(seriesDataHumid);
+        seriesHumid.name("Humidity");
+        seriesHumid.color("#4F5783");
+
+        anyChartViewHumid.setChart(cartesianHumid);
+
     }
 
-    private class CustomDataEntry extends ValueDataEntry {
+    private void updateCharts(Date start, Date end){
+        DbMock dbMock = new DbMock();
+        parametersRecords = dbMock.getRecordsForSensorInRange(sensorId, start, end);
 
-        CustomDataEntry(TemperatureRecord record) {
-            super(record.getDateString(), record.getValue());
+        //--- temperature chart ---
+        AnyChartView anyChartViewTemp = findViewById(R.id.temperature_chart);
+        APIlib.getInstance().setActiveAnyChartView(anyChartViewTemp);
+
+        List<DataEntry> seriesDataTemp = new ArrayList<>();
+        for (ParametersRecord record : parametersRecords) {
+            seriesDataTemp.add(new CustomDataEntryTemp(record));
+        }
+
+        cartesianTemp.removeAllSeries();
+        seriesTemp = cartesianTemp.line(seriesDataTemp);
+        seriesTemp.color("#4F5783");
+
+        //--- humidity chart ---
+        AnyChartView anyChartViewHumid = findViewById(R.id.humidity_chart);
+        APIlib.getInstance().setActiveAnyChartView(anyChartViewHumid);
+
+        List<DataEntry> seriesDataHumid = new ArrayList<>();
+        for (ParametersRecord record : parametersRecords) {
+            seriesDataHumid.add(new CustomDataEntryHumid(record));
+        }
+
+        cartesianHumid.removeAllSeries();
+        seriesHumid = cartesianHumid.line(seriesDataHumid);
+        seriesHumid.color("#4F5783");
+    }
+
+
+    private class CustomDataEntryTemp extends ValueDataEntry {
+        CustomDataEntryTemp(ParametersRecord record) {
+            super(record.getDateString(), record.getTemperature());
+        }
+
+    }
+
+    private class CustomDataEntryHumid extends ValueDataEntry {
+        CustomDataEntryHumid(ParametersRecord record) {
+            super(record.getDateString(), record.getHumidity());
         }
 
     }
